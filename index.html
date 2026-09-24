@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>編集デスク｜承認</title>
+<style>
+  :root{
+    --paper:#F4F2EA; --card:#FCFBF6; --ink:#212B41; --inkSoft:#63604F;
+    --rule:#DFD9C9; --red:#BE402C; --good:#4C6B55;
+    --mincho:"Hiragino Mincho ProN","Yu Mincho",YuMincho,"Noto Serif JP",serif;
+    --gothic:"Hiragino Kaku Gothic ProN","Yu Gothic",YuGothic,"Noto Sans JP",sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--gothic);
+    padding:0 18px 120px;line-height:1.6}
+  .wrap{max-width:620px;margin:0 auto}
+  header{padding:26px 0 10px}
+  .logo{display:flex;align-items:flex-end;gap:10px}
+  h1{font-family:var(--mincho);font-size:28px;letter-spacing:.04em;margin:0;line-height:1}
+  .sub{color:var(--inkSoft);font-size:13px;margin:8px 0 0}
+  .rule{border-bottom:1px solid var(--rule);margin:14px 0}
+  details{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:10px 14px;margin-bottom:14px}
+  summary{cursor:pointer;font-size:14px}
+  label{display:block;font-size:12px;color:var(--inkSoft);margin:10px 0 3px}
+  input[type=text],input[type=password],input[type=date]{
+    width:100%;border:1px solid var(--rule);border-radius:9px;padding:9px 11px;font-size:14px;
+    background:#fff;color:var(--ink);font-family:var(--gothic)}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .row>*{flex:0 0 auto}
+  button{font-family:var(--gothic);cursor:pointer;border:none;border-radius:10px}
+  .btn{background:var(--ink);color:var(--paper);padding:9px 16px;font-size:14px}
+  .btn.ghost{background:transparent;border:1px solid var(--rule);color:var(--ink)}
+  .btn.red{background:var(--red);color:var(--paper)}
+  .status{font-size:14px;color:var(--inkSoft);margin:6px 0 14px}
+  .status b{color:var(--ink)}
+  .card{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:14px;margin-bottom:16px}
+  .card.approved{border-color:var(--good)}
+  .card.posted{opacity:.6}
+  .meta{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+  .slot{font-family:var(--mincho);font-size:18px}
+  .type{font-size:12px;color:var(--inkSoft)}
+  .badge{font-size:11px;border:1px solid var(--rule);border-radius:999px;padding:2px 8px;color:var(--inkSoft)}
+  textarea{width:100%;border:1px solid var(--rule);border-radius:11px;padding:12px;
+    font-size:15px;line-height:1.85;font-family:var(--gothic);color:var(--ink);background:#fff;resize:vertical}
+  .foot{display:flex;align-items:center;gap:12px;margin-top:8px}
+  .count{font-size:12px;color:var(--inkSoft)}
+  .score{margin-left:auto;font-size:12px}
+  .marks{margin-top:10px;font-size:13px}
+  .mark{display:flex;gap:8px;margin-bottom:5px;align-items:baseline}
+  .mw{color:var(--red);text-decoration:underline wavy;text-underline-offset:3px}
+  .mwhy{color:var(--inkSoft);font-size:12px}
+  .ok{color:var(--good)}
+  .toggle{padding:8px 14px;font-size:14px;border:1px solid var(--rule);background:transparent;color:var(--inkSoft)}
+  .toggle.on{background:var(--good);color:var(--paper);border-color:var(--good)}
+  .savebar{position:fixed;left:0;right:0;bottom:0;background:var(--paper);
+    border-top:1px solid var(--rule);padding:12px 18px;display:flex;gap:12px;align-items:center;justify-content:center}
+  .savebar .btn{flex:1;max-width:420px;padding:13px}
+  .msg{font-size:13px;text-align:center;margin:0 0 8px;min-height:18px}
+  .msg.err{color:var(--red)} .msg.good{color:var(--good)} .msg.info{color:var(--inkSoft)}
+  .hint{font-size:12px;color:var(--inkSoft);margin-top:8px;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">
+      <h1>承認</h1>
+      <svg width="34" height="20" viewBox="0 0 34 20" fill="none" style="margin-bottom:3px">
+        <path d="M2 15 C 9 4, 15 4, 20 11 S 30 15, 32 5" stroke="var(--red)" stroke-width="2.4" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <p class="sub">朝いちで5本、まとめて承認。</p>
+    <div class="rule"></div>
+  </header>
+
+  <details id="cfg">
+    <summary>設定（初回だけ）</summary>
+    <label>GitHubユーザー名（owner）</label>
+    <input type="text" id="owner" placeholder="shima など" autocapitalize="off" autocorrect="off" spellcheck="false"/>
+    <label>リポジトリ名（repo）</label>
+    <input type="text" id="repo" placeholder="henshu-routine" autocapitalize="off" autocorrect="off" spellcheck="false"/>
+    <label>ブランチ</label>
+    <input type="text" id="branch" placeholder="main" autocapitalize="off" autocorrect="off" spellcheck="false"/>
+    <label>アクセストークン（Fine-grained PAT・Contents読み書き）</label>
+    <input type="password" id="token" placeholder="github_pat_..." autocapitalize="off" autocorrect="off" spellcheck="false"/>
+    <div class="row" style="margin-top:10px">
+      <button class="btn ghost" id="saveCfg">保存</button>
+      <button class="btn ghost" id="clearTok">トークンを消す</button>
+    </div>
+    <p class="hint">トークンはこの端末のブラウザ内だけに保存され、GitHub以外には送りません。自分の端末だけで使ってください。ドラフトを非公開にしたいなら、ルーティンのリポジトリは private にし、このページ（秘密を含まない）は別の公開先に置けます。</p>
+  </details>
+
+  <div class="row" style="margin-bottom:12px">
+    <input type="date" id="date" style="max-width:180px"/>
+    <button class="btn ghost" id="load">読み込む</button>
+  </div>
+
+  <p class="msg info" id="msg"></p>
+  <div class="status" id="status"></div>
+  <div class="row" style="margin-bottom:14px">
+    <button class="btn ghost" id="allOn">全部承認</button>
+    <button class="btn ghost" id="allOff">全部除外</button>
+  </div>
+
+  <div id="list"></div>
+</div>
+
+<div class="savebar">
+  <button class="btn" id="save">GitHubに保存（承認を反映）</button>
+</div>
+
+<script>
+/* ── red-pen check（ダッシュボードと同じ） ── */
+const NG=[["いかがでした","問いかけの締めは避ける。言い切る"],["いかがでしょう","問いかけの締めは避ける。言い切る"],
+["と言えるでしょう","言い切る（〜だ）"],["と言えます","言い切る（〜だ）"],["重要です","なぜ重要かを場面で示す"],
+["大切です","具体で示す"],["様々な","固有名詞・数字・一場面に"],["さまざまな","固有名詞・数字・一場面に"],
+["多くの","数字か具体の対象に"],["いろいろな","具体に落とす"],["非常に","程度語を消して具体に"],
+["とても","程度語を消して具体に"],["かなり","程度語を消して具体に"],["しっかり","何をどうするか具体に"],
+["きちんと","何をどうするか具体に"],["ぜひ","消す"],["まとめると","要約の合図はいらない"],
+["ではないでしょうか","言い切るか、問いを一つに"],["と思います","言い切れる所は言い切る"]];
+const HYPE=[["必ず","誇大"],["確実に","誇大"],["最短で","誇大"],["最短","誇大"]];
+const HW=new Set(HYPE.map(h=>h[0]));
+function analyze(t){t=t||"";
+  const chars=t.replace(/\s/g,"").length;
+  const lines=t.split(/\n/).map(l=>l.trim()).filter(Boolean);
+  const groups=t.split(/\n\s*\n/).map(g=>g.trim()).filter(Boolean).length;
+  const flags=[]; NG.concat(HYPE).forEach(([w,why])=>{if(t.includes(w))flags.push({w,why,hype:HW.has(w)});});
+  const pe=/(です|ます|ました|でした|ません|でしょう)。?$/;
+  const allPolite=lines.length>=3&&lines.every(l=>pe.test(l));
+  let s=100-flags.length*12; if(chars>400)s-=15; if(groups>5)s-=10; if(allPolite)s-=12;
+  return{chars,groups,flags,allPolite,score:Math.max(0,Math.min(100,s))};
+}
+const TYPE_NAME={shoutai:"正体・あるある",naoshi:"直し方・型",shoumou:"発信の消耗",jitsuen:"実演・メタ",cta:"CTA"};
+
+/* ── github contents api ── */
+const LS="henshu.gh.";
+const $=id=>document.getElementById(id);
+function cfg(){return{owner:($( "owner").value||"").trim(),repo:($("repo").value||"").trim(),
+  branch:(($("branch").value||"main").trim()),token:($("token").value||"").trim()};}
+function loadCfg(){["owner","repo","branch","token"].forEach(k=>{const v=localStorage.getItem(LS+k);if(v)$(k).value=v;});
+  if(!$("branch").value)$("branch").value="main";}
+function saveCfg(){["owner","repo","branch","token"].forEach(k=>localStorage.setItem(LS+k,$(k).value.trim()));}
+function b64enc(str){const b=new TextEncoder().encode(str);let s="";b.forEach(x=>s+=String.fromCharCode(x));return btoa(s);}
+function b64dec(b){const bin=atob((b||"").replace(/\n/g,""));return new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0)));}
+function todayJST(){return new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Tokyo"});}
+function api(path,opt){const c=cfg();return fetch("https://api.github.com/repos/"+c.owner+"/"+c.repo+path,
+  Object.assign({headers:{"Authorization":"Bearer "+c.token,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"}},opt||{}));}
+
+let state={sha:null,data:null,path:null};
+function setMsg(t,cls){const m=$("msg");m.textContent=t||"";m.className="msg "+(cls||"info");}
+
+async function loadQueue(){
+  const c=cfg();
+  if(!c.owner||!c.repo||!c.token){setMsg("設定を入れてください（owner / repo / トークン）","err");$("cfg").open=true;return;}
+  const date=$("date").value||todayJST();
+  const path="/contents/queue/"+date+".json?ref="+encodeURIComponent(c.branch);
+  setMsg("読み込み中…","info");
+  try{
+    const r=await api(path);
+    if(r.status===404){setMsg(date+" の下書きがまだない（朝6:30の生成待ち）","info");$("list").innerHTML="";$("status").textContent="";return;}
+    if(r.status===401||r.status===403){setMsg("トークンが無効か、権限が足りません（Contents読み書き）","err");return;}
+    if(!r.ok){setMsg("読み込み失敗（"+r.status+"）","err");return;}
+    const j=await r.json();
+    state.sha=j.sha; state.path="/contents/queue/"+date+".json";
+    state.data=JSON.parse(b64dec(j.content));
+    render(); setMsg("");
+  }catch(e){setMsg("読み込みでエラー: "+e.message,"err");}
+}
+
+function render(){
+  const items=(state.data&&state.data.items)||[];
+  const list=$("list"); list.innerHTML="";
+  items.forEach((it,i)=>{
+    const posted=!!it.posted;
+    const card=document.createElement("div");
+    card.className="card"+(it.approved?" approved":"")+(posted?" posted":"");
+    card.innerHTML=
+      '<div class="meta"><span class="slot">'+ (it.slot||"") +'</span>'+
+      '<span class="type">'+ (TYPE_NAME[it.type]||it.type||"") +'</span>'+
+      (posted?'<span class="badge" style="margin-left:auto">投稿済み</span>':'')+'</div>'+
+      '<textarea data-idx="'+i+'" rows="6" '+(posted?"disabled":"")+'>'+ (it.text||"").replace(/</g,"&lt;") +'</textarea>'+
+      '<div class="foot"><span class="count" id="cnt-'+i+'"></span>'+
+      '<span class="score" id="scr-'+i+'"></span></div>'+
+      '<div class="marks" id="chk-'+i+'"></div>'+
+      '<div style="margin-top:10px">'+
+      (posted?'':'<button class="toggle'+(it.approved?" on":"")+'" data-tg="'+i+'">'+(it.approved?"承認中":"承認する")+'</button>')+
+      '</div>';
+    list.appendChild(card);
+    refreshCheck(i);
+  });
+  updateStatus();
+}
+function refreshCheck(i){
+  const it=state.data.items[i]; const a=analyze(it.text||"");
+  $("cnt-"+i).textContent=a.chars+"字 · "+a.groups+"かたまり";
+  const sc=$("scr-"+i); sc.textContent="人間味 "+a.score; sc.style.color=a.score>=80?"var(--good)":"var(--red)";
+  const box=$("chk-"+i); box.innerHTML="";
+  if(a.flags.length===0&&!a.allPolite){box.innerHTML='<span class="ok">直す場所は見つからない。</span>';return;}
+  if(a.allPolite)box.insertAdjacentHTML("beforeend",'<div class="mark"><span class="mw">敬体</span><span class="mwhy">全文が敬体。一行だけ体言止めや独り言に崩す</span></div>');
+  a.flags.forEach(f=>box.insertAdjacentHTML("beforeend",'<div class="mark"><span class="mw">'+f.w+'</span><span class="mwhy">→ '+f.why+(f.hype?"（規約でもNG）":"")+'</span></div>'));
+}
+function updateStatus(){
+  const items=(state.data&&state.data.items)||[];
+  const ap=items.filter(x=>x.approved).length;
+  $("status").innerHTML=items.length?('全'+items.length+'本中 <b>'+ap+'本</b> 承認'):"";
+}
+
+/* events */
+$("list").addEventListener("input",e=>{const t=e.target;if(t.matches("textarea[data-idx]")){
+  const i=+t.getAttribute("data-idx"); state.data.items[i].text=t.value; refreshCheck(i);}});
+$("list").addEventListener("click",e=>{const b=e.target.closest("[data-tg]");if(!b)return;
+  const i=+b.getAttribute("data-tg"); const it=state.data.items[i]; it.approved=!it.approved;
+  b.classList.toggle("on",it.approved); b.textContent=it.approved?"承認中":"承認する";
+  b.closest(".card").classList.toggle("approved",it.approved); updateStatus();});
+$("allOn").onclick=()=>{if(!state.data)return;state.data.items.forEach(x=>{if(!x.posted)x.approved=true;});render();};
+$("allOff").onclick=()=>{if(!state.data)return;state.data.items.forEach(x=>{if(!x.posted)x.approved=false;});render();};
+
+async function saveQueue(){
+  if(!state.data){setMsg("先に読み込んでください","err");return;}
+  setMsg("保存中…","info");
+  const body={message:"approve: "+state.data.date,content:b64enc(JSON.stringify(state.data,null,2)),
+    sha:state.sha,branch:cfg().branch};
+  try{
+    const r=await api(state.path,{method:"PUT",body:JSON.stringify(body)});
+    if(r.status===409||r.status===422){setMsg("他の変更とぶつかりました。読み込み直します…","err");await loadQueue();return;}
+    if(!r.ok){setMsg("保存失敗（"+r.status+"）","err");return;}
+    const j=await r.json(); state.sha=j.content.sha;
+    const ap=state.data.items.filter(x=>x.approved).length;
+    setMsg("保存した。承認 "+ap+"本が予定時刻に出ます。","good");
+  }catch(e){setMsg("保存でエラー: "+e.message,"err");}
+}
+
+$("saveCfg").onclick=()=>{saveCfg();setMsg("設定を保存した。","good");$("cfg").open=false;loadQueue();};
+$("clearTok").onclick=()=>{localStorage.removeItem(LS+"token");$("token").value="";setMsg("トークンを消した。","info");};
+$("load").onclick=loadQueue;
+$("save").onclick=saveQueue;
+
+/* init */
+loadCfg();
+$("date").value=todayJST();
+if(cfg().owner&&cfg().repo&&cfg().token)loadQueue();
+</script>
+</body>
+</html>
