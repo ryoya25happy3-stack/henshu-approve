@@ -102,7 +102,7 @@
     <label>ブランチ</label>
     <input type="text" id="branch" autocapitalize="off" autocorrect="off" spellcheck="false"/>
     <label>アクセストークン（Fine-grained PAT・Contents読み書き）</label>
-    <input type="password" id="token" autocapitalize="off" autocorrect="off" spellcheck="false"/>
+    <input type="password" id="token" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"/>
     <div class="row" style="margin-top:10px">
       <button class="btn ghost" id="saveCfg">保存</button>
       <button class="btn ghost" id="clearTok">トークンを消す</button>
@@ -126,13 +126,14 @@
 <script>
 /* ===== アカウント定義（accounts.py と合わせる） ===== */
 const ACC={
-  fukugyo:{handle:"salesman_firsttime",q:"queue",d:"drafts",color:"var(--fukugyo)",
-    types:{shoutai:"正体・あるある",naoshi:"直し方・型",shoumou:"発信の消耗",jitsuen:"実演・メタ",cta:"CTA"}},
-  intj:{handle:"intj_labo",q:"queue/intj",d:"drafts/intj",color:"var(--intj)",
-    types:{aruaru:"あるある分解",gokai:"誤解の訂正",shikou:"頭の中の手順",ningen:"人間関係・相性",dantei:"一言断定"}},
-  intp:{handle:"intp_labo",q:"queue/intp",d:"drafts/intp",color:"var(--intp)",
-    types:{aruaru:"あるある分解",toi:"問いと仮説",datsusen:"脱線分析",gokai:"誤解の訂正",hitorigoto:"独り言"}},
+  fukugyo:{handle:"salesman_firsttime",q:"queue",d:"drafts",n:"notes/fukugyo",color:"var(--fukugyo)",
+    types:{shoutai:"困りごと",shoumou:"実況",naoshi:"小技",jitsuen:"やってよかった",cta:"本音"}},
+  intj:{handle:"intj_labo",q:"queue/intj",d:"drafts/intj",n:"notes/intj",color:"var(--intj)",
+    types:{aruaru:"観察",gokai:"場面",shikou:"深掘り",ningen:"扱い方",dantei:"本音"}},
+  intp:{handle:"intp_labo",q:"queue/intp",d:"drafts/intp",n:"notes/intp",color:"var(--intp)",
+    types:{aruaru:"観察",toi:"場面",datsusen:"深掘り",gokai:"扱い方",hitorigoto:"本音"}},
 };
+Object.values(ACC).forEach(a=>a.types.announce="note告知");
 const CHART_COLOR={fukugyo:"#C0623B",intj:"#1F2A44",intp:"#2E7D6B"};
 
 /* ===== 朱入れ（従来と同じ） ===== */
@@ -142,8 +143,11 @@ const NG=[["いかがでした","問いかけの締めは避ける。言い切�
 ["多くの","数字か具体の対象に"],["いろいろな","具体に落とす"],["非常に","程度語を消して具体に"],
 ["とても","程度語を消して具体に"],["かなり","程度語を消して具体に"],["しっかり","何をどうするか具体に"],
 ["きちんと","何をどうするか具体に"],["ぜひ","消す"],["まとめると","要約の合図はいらない"],
-["ではないでしょうか","言い切るか、問いを一つに"],["と思います","言い切れる所は言い切る"]];
-const HYPE=[["必ず","誇大"],["確実に","誇大"],["最短で","誇大"],["最短","誇大"]];
+["ではないでしょうか","言い切るか、問いを一つに"],["と思います","言い切れる所は言い切る"],
+["大切なのは","具体で示す"],["わけじゃない。ただ","型っぽい言い回し。別の言い方に"],["わけではない。ただ","型っぽい言い回し。別の言い方に"],
+["それだけで","型っぽい言い回し。別の言い方に"],["少し楽になる","型っぽい締め。具体に"],["てもいい。","読み手への指示形。自分の語りに"],
+["なくていい。","読み手への指示形。自分の語りに"],["すべき","読み手への指示形。自分の語りに"],["【実数】","数字が埋まっていない"]];
+const HYPE=[["必ず","誇大"],["確実に","誇大"],["最短で","誇大"],["最短","誇大"],["誰でも","誇大"],["稼げる","誇大"]];
 const HW=new Set(HYPE.map(h=>h[0]));
 function analyze(t){t=t||"";
   const chars=t.replace(/\s/g,"").length;
@@ -152,7 +156,7 @@ function analyze(t){t=t||"";
   const flags=[]; NG.concat(HYPE).forEach(([w,why])=>{if(t.includes(w))flags.push({w,why,hype:HW.has(w)});});
   const pe=/(です|ます|ました|でした|ません|でしょう)。?$/;
   const allPolite=lines.length>=3&&lines.every(l=>pe.test(l));
-  let s=100-flags.length*12; if(chars>400)s-=15; if(groups>5)s-=10; if(allPolite)s-=12;
+  let s=100-flags.length*12; if(chars>250)s-=15; if(groups>5)s-=10; if(allPolite)s-=12;
   return{chars,groups,flags,allPolite,score:Math.max(0,Math.min(100,s))};
 }
 
@@ -160,11 +164,13 @@ function analyze(t){t=t||"";
 const LS="henshu.gh.";
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-function cfg(){return{owner:($("owner").value||"").trim(),repo:($("repo").value||"").trim(),
-  branch:(($("branch").value||"main").trim()),token:($("token").value||"").trim()};}
+/* 全角スペースや日本語など、ヘッダーに使えない文字は取り除く */
+const clean=v=>(v||"").replace(/[^\x21-\x7E]/g,"");
+function cfg(){return{owner:clean($("owner").value),repo:clean($("repo").value),
+  branch:clean($("branch").value)||"main",token:clean($("token").value)};}
 function loadCfg(){["owner","repo","branch","token"].forEach(k=>{const v=localStorage.getItem(LS+k);if(v)$(k).value=v;});
   if(!$("branch").value)$("branch").value="henshu-routine";}
-function saveCfgLS(){["owner","repo","branch","token"].forEach(k=>localStorage.setItem(LS+k,$(k).value.trim()));}
+function saveCfgLS(){["owner","repo","branch","token"].forEach(k=>{$(k).value=clean($(k).value);localStorage.setItem(LS+k,$(k).value);});}
 function b64enc(str){const b=new TextEncoder().encode(str);let s="";b.forEach(x=>s+=String.fromCharCode(x));return btoa(s);}
 function b64dec(b){const bin=atob((b||"").replace(/\n/g,""));return new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0)));}
 function todayJST(){return new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Tokyo"});}
@@ -178,6 +184,13 @@ async function getFile(path){
   if(!r.ok) return {status:r.status};
   const j=await r.json();
   return {status:200,sha:j.sha,text:b64dec(j.content)};
+}
+async function getBlobURL(path){
+  const c=cfg();
+  const r=await fetch("https://api.github.com/repos/"+c.owner+"/"+c.repo+"/contents/"+path+"?ref="+encodeURIComponent(c.branch),
+    {headers:{"Authorization":"Bearer "+c.token,"Accept":"application/vnd.github.raw","X-GitHub-Api-Version":"2022-11-28"}});
+  if(!r.ok) return null;
+  return URL.createObjectURL(await r.blob());
 }
 async function putFile(path,text,sha,message){
   const body={message,content:b64enc(text),branch:cfg().branch};
@@ -347,22 +360,96 @@ async function copyRich(html,text){
     setMsg("コピーした。noteの本文欄に貼り付けてください。","good");
   }catch(e){setMsg("コピーできませんでした: "+e.message,"err");}
 }
+function chromePrompt(acc,n){
+  const paid=n.kind==="paid";
+  const here=location.origin+location.pathname+"?acc="+acc+"&date="+state.date+"&type=note";
+  const L=[];
+  L.push("noteに記事の下書きを作ってください。公開はせず、下書き保存までで止めてください。");
+  L.push("");
+  L.push("【素材のある場所】");
+  L.push("管制塔: "+here);
+  L.push("（このタブで開くと、記事・サムネ・コピー用のボタンが表示されます）");
+  L.push("");
+  L.push("【記事の情報】");
+  L.push("・アカウント: "+ACC[acc].handle+" に対応するnoteアカウント（ログイン中のnoteアカウントが違う場合は作業せず、教えてください）");
+  L.push("・タイトル: "+n.title);
+  L.push("・種類: "+(paid?"有料（"+n.price+"円）":"無料"));
+  if(n.hashtags&&n.hashtags.length) L.push("・ハッシュタグ: "+n.hashtags.join(" "));
+  L.push("");
+  L.push("【手順】");
+  L.push("1. note.com で「投稿」→「テキスト」を開き、新しい記事を作る");
+  L.push("2. タイトル欄に上のタイトルを入力する");
+  L.push("3. 管制塔の「本文（書式つき）」ボタンを押してコピーし、noteの本文欄に貼り付ける。見出しや太字が崩れていたら、noteの見出し機能で整える");
+  L.push("4. 管制塔の「サムネを保存」でダウンロードした画像を、noteの見出し画像に設定する");
+  if(paid){
+    L.push("5. 本文中の「――― ここから有料 ―――」の行を削除し、その位置に有料エリアの境界線を置く");
+    L.push("6. 公開設定で「有料」を選び、価格を"+n.price+"円にする");
+    L.push("7. ハッシュタグを上のとおり設定する");
+    L.push("8. 「下書き保存」を押す。公開ボタンは押さない");
+  }else{
+    L.push("5. ハッシュタグを上のとおり設定する");
+    L.push("6. 「下書き保存」を押す。公開ボタンは押さない");
+  }
+  L.push("");
+  L.push("終わったら、うまくいかなかった箇所があれば具体的に教えてください。");
+  return L.join("\n");
+}
+
 async function viewNote(acc){
-  const f=await getFile(ACC[acc].d+"/"+state.date+".md");
-  const n=f.status===200?parseNote(f.text):null;
+  const jpath=ACC[acc].n+"/"+state.date+".json";
+  const jf=await getFile(jpath);
+  let n=null, sha=null;
+  if(jf.status===200){n=JSON.parse(jf.text);sha=jf.sha;}
+  else{
+    const f=await getFile(ACC[acc].d+"/"+state.date+".md");
+    const old=f.status===200?parseNote(f.text):null;
+    if(old) n={title:old.title,body:old.body,kind:"free",alt_titles:old.other?old.other.split(" / "):[],hashtags:[]};
+  }
   if(!n){$("view").innerHTML=subTabs(acc)+'<p class="type">'+state.date+' のnote下書きはありません（noteの生成日だけ作られます）</p>';setMsg("");return;}
   const html=md2html(n.body);
+  const paid=n.kind==="paid";
   $("view").innerHTML=subTabs(acc)
-    +'<div class="card"><p class="ntitle">'+esc(n.title)+'</p>'
+    +'<div class="card">'
+    +'<div class="meta"><span class="badge '+(paid?"red":"good")+'">'+(paid?"有料・"+n.price+"円":"無料")+'</span>'
+    +(n.chars?'<span class="type">'+n.chars+'字</span>':'')
+    +(n.announced?'<span class="badge good right">告知済み '+esc(n.announced.slice(5))+'</span>':(n.url?'<span class="badge right">明朝に告知予定</span>':''))+'</div>'
+    +'<div id="thumbBox" style="margin:4px 0 12px"></div>'
+    +'<p class="ntitle">'+esc(n.title)+'</p>'
     +'<div class="row" style="margin-bottom:12px">'
-    +'<button class="btn small" id="cpTitle">タイトルをコピー</button>'
-    +'<button class="btn small" id="cpBody">本文をコピー（書式つき）</button>'
+    +'<button class="btn small" id="cpTitle">タイトル</button>'
+    +'<button class="btn small" id="cpBody">本文（書式つき）</button>'
+    +(n.hashtags&&n.hashtags.length?'<button class="btn small" id="cpTags">ハッシュタグ</button>':'')
     +'<a class="btn ghost small" href="https://note.com/" target="_blank" rel="noopener" style="text-decoration:none">noteを開く</a></div>'
-    +'<div class="article" id="art">'+html+'</div>'
-    +(n.other?'<p class="hint">別のネタ候補：'+esc(n.other)+'</p>':'')
-    +'<p class="hint">サムネは次のSTEPで自動生成してここに出します。有料回は赤い点線の位置で有料ラインを設定してください。</p></div>';
+    +'<div style="margin:-4px 0 12px"><button class="btn small" id="cpPrompt" style="background:var(--good)">Claude in Chrome用の指示をコピー</button></div>'
+    +(paid?'<p class="hint" style="margin-top:0">有料回：noteの編集画面で、赤い点線の位置に「有料エリア」の境界線を置き、価格を'+n.price+'円に設定してください。</p>':'')
+    +'<div class="article">'+html+'</div>'
+    +(n.alt_titles&&n.alt_titles.length?'<p class="hint">別のタイトル候補：'+n.alt_titles.map(esc).join(" / ")+'</p>':'')
+    +'</div>'
+    +(jf.status===200?'<div class="card"><h2 class="sec">公開したらURLを登録</h2>'
+      +'<input type="text" id="noteUrl" placeholder="https://note.com/..." value="'+esc(n.url||"")+'" autocapitalize="off" spellcheck="false"/>'
+      +'<div style="margin-top:10px"><button class="btn" id="saveUrl">登録する</button></div>'
+      +'<p class="hint">登録すると、翌朝の生成で '+esc(ACC[acc].handle)+' の最後の枠がこの記事の告知投稿になります。</p></div>':'');
+
+  if(n.thumb){
+    const u=await getBlobURL(n.thumb);
+    if(u) $("thumbBox").innerHTML='<img src="'+u+'" alt="サムネ" style="width:100%;border-radius:10px;border:1px solid var(--rule)">'
+      +'<div style="margin-top:8px"><a class="btn ghost small" href="'+u+'" download="'+acc+'_'+state.date+'.png" style="text-decoration:none">サムネを保存</a></div>';
+  }
   $("cpTitle").onclick=()=>navigator.clipboard.writeText(n.title).then(()=>setMsg("タイトルをコピーした。","good"));
   $("cpBody").onclick=()=>copyRich(html.replace(/<hr class="paywall">/g,"<p>――― ここから有料 ―――</p>"),md2text(n.body));
+  $("cpPrompt").onclick=()=>navigator.clipboard.writeText(chromePrompt(acc,n)).then(()=>setMsg("指示をコピーした。Claude in Chromeに貼り付けてください。","good"));
+  if($("cpTags")) $("cpTags").onclick=()=>navigator.clipboard.writeText(n.hashtags.join(" ")).then(()=>setMsg("ハッシュタグをコピーした。","good"));
+  if($("saveUrl")) $("saveUrl").onclick=async()=>{
+    const url=$("noteUrl").value.trim();
+    if(!/^https:\/\/note\.com\//.test(url)){setMsg("noteの記事URL（https://note.com/〜）を入れてください","err");return;}
+    setMsg("登録中…","info");
+    try{
+      const cur=await getFile(jpath); const data=JSON.parse(cur.text); data.url=url;
+      const r=await putFile(jpath,JSON.stringify(data,null,2),cur.sha,"note url("+acc+"): "+state.date);
+      if(r.conflict){setMsg("ぶつかりました。もう一度押してください。","err");return;}
+      setMsg("登録した。明日の朝、告知投稿が作られます。","good");
+    }catch(e){setMsg(e.message,"err");}
+  };
   setMsg("");
 }
 
