@@ -78,6 +78,9 @@
   .chartbox{position:relative;height:240px}
   .top{font-size:13px;border-bottom:1px solid var(--rule);padding:8px 0}
   .top:last-child{border-bottom:none}
+  .tags{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
+  .tag{font-size:13px;padding:5px 10px;border-radius:999px;border:1px solid var(--rule);background:#fff;color:var(--ink);cursor:pointer}
+  .tag.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
   h2.sec{font-family:var(--mincho);font-size:17px;margin:4px 0 10px;font-weight:600}
 </style>
 </head>
@@ -374,7 +377,10 @@ function chromePrompt(acc,n){
   L.push("・アカウント: "+ACC[acc].handle+" に対応するnoteアカウント（ログイン中のnoteアカウントが違う場合は作業せず、教えてください）");
   L.push("・タイトル: "+n.title);
   L.push("・種類: "+(paid?"有料（"+n.price+"円）":"無料"));
-  if(n.hashtags&&n.hashtags.length) L.push("・ハッシュタグ: "+n.hashtags.join(" "));
+  if(n.hashtags&&n.hashtags.length){
+    const chosen=[...document.querySelectorAll("#tagBox .tag.on")].map(b=>n.hashtags[+b.dataset.tag]);
+    L.push("・ハッシュタグ: "+(chosen.length?chosen:n.hashtags).join(" "));
+  }
   L.push("");
   L.push("【手順】");
   L.push("1. note.com で「投稿」→「テキスト」を開き、新しい記事を作る");
@@ -418,13 +424,17 @@ async function viewNote(acc){
     +'<div class="row" style="margin-bottom:12px">'
     +'<button class="btn small" id="cpTitle">タイトル</button>'
     +'<button class="btn small" id="cpBody">本文（書式つき）</button>'
-    +(n.hashtags&&n.hashtags.length?'<button class="btn small" id="cpTags">ハッシュタグ</button>':'')
     +'<a class="btn ghost small" href="https://note.com/" target="_blank" rel="noopener" style="text-decoration:none">noteを開く</a></div>'
     +'<div style="margin:-4px 0 12px"><button class="btn small" id="cpPrompt" style="background:var(--good)">Claude in Chrome用の指示をコピー</button></div>'
     +(paid?'<p class="hint" style="margin-top:0">有料回：noteの編集画面で、赤い点線の位置に「有料エリア」の境界線を置き、価格を'+n.price+'円に設定してください。</p>':'')
     +'<div class="article">'+html+'</div>'
     +(n.alt_titles&&n.alt_titles.length?'<p class="hint">別のタイトル候補：'+n.alt_titles.map(esc).join(" / ")+'</p>':'')
     +'</div>'
+    +(n.hashtags&&n.hashtags.length?'<div class="card"><h2 class="sec">ハッシュタグ（'+n.hashtags.length+'個）</h2>'
+      +'<p class="hint" style="margin-top:0">関連するnote記事でよく使われている順。タップで選ぶ／外す（最初は全部選択）。</p>'
+      +'<div class="tags" id="tagBox">'+n.hashtags.map((t,i)=>'<button class="tag on" data-tag="'+i+'">'+esc(t)+'</button>').join("")+'</div>'
+      +'<div class="row"><button class="btn small" id="cpTagsSel">選んだタグをコピー</button>'
+      +'<button class="btn ghost small" id="tagAll">全部選ぶ</button><button class="btn ghost small" id="tagNone">全部外す</button></div></div>':'')
     +(jf.status===200?'<div class="card"><h2 class="sec">公開したらURLを登録</h2>'
       +'<input type="text" id="noteUrl" placeholder="https://note.com/..." value="'+esc(n.url||"")+'" autocapitalize="off" spellcheck="false"/>'
       +'<div style="margin-top:10px"><button class="btn" id="saveUrl">登録する</button></div>'
@@ -438,7 +448,14 @@ async function viewNote(acc){
   $("cpTitle").onclick=()=>navigator.clipboard.writeText(n.title).then(()=>setMsg("タイトルをコピーした。","good"));
   $("cpBody").onclick=()=>copyRich(html.replace(/<hr class="paywall">/g,"<p>――― ここから有料 ―――</p>"),md2text(n.body));
   $("cpPrompt").onclick=()=>navigator.clipboard.writeText(chromePrompt(acc,n)).then(()=>setMsg("指示をコピーした。Claude in Chromeに貼り付けてください。","good"));
-  if($("cpTags")) $("cpTags").onclick=()=>navigator.clipboard.writeText(n.hashtags.join(" ")).then(()=>setMsg("ハッシュタグをコピーした。","good"));
+  if($("tagBox")){
+    const sel=()=>[...document.querySelectorAll("#tagBox .tag.on")].map(b=>n.hashtags[+b.dataset.tag]);
+    $("tagBox").onclick=e=>{const b=e.target.closest(".tag");if(b)b.classList.toggle("on");};
+    $("tagAll").onclick=()=>document.querySelectorAll("#tagBox .tag").forEach(b=>b.classList.add("on"));
+    $("tagNone").onclick=()=>document.querySelectorAll("#tagBox .tag").forEach(b=>b.classList.remove("on"));
+    $("cpTagsSel").onclick=()=>{const t=sel();if(!t.length){setMsg("タグが選ばれていません","err");return;}
+      navigator.clipboard.writeText(t.join(" ")).then(()=>setMsg(t.length+"個のハッシュタグをコピーした。","good"));};
+  }
   if($("saveUrl")) $("saveUrl").onclick=async()=>{
     const url=$("noteUrl").value.trim();
     if(!/^https:\/\/note\.com\//.test(url)){setMsg("noteの記事URL（https://note.com/〜）を入れてください","err");return;}
