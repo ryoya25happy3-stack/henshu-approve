@@ -471,7 +471,7 @@ async function viewNote(acc){
       +'<input type="text" id="noteUrl" placeholder="https://note.com/..." value="'+esc(n.url||"")+'" autocapitalize="off" spellcheck="false"/>'
       +'<div style="margin-top:10px"><button class="btn" id="saveUrl">登録する</button></div>'
       +'<p class="hint">'+(noteOnly?"公開済みの記録として残ります（このアカはThreadsがないので、告知投稿は作られません）。"
-        :"登録すると、翌朝の生成で "+esc(ACC[acc].handle)+" の最後の枠がこの記事の告知投稿になります。")+'</p></div>':'');
+        :"登録すると、今日の告知枠が出るとき、そのリプにこのURLが自動で添付されます。")+'</p></div>':'');
 
   if(n.thumb){
     const u=await getBlobURL(n.thumb);
@@ -497,7 +497,29 @@ async function viewNote(acc){
       const cur=await getFile(jpath); const data=JSON.parse(cur.text); data.url=url;
       const r=await putFile(jpath,JSON.stringify(data,null,2),cur.sha,"note url("+acc+"): "+state.date);
       if(r.conflict){setMsg("ぶつかりました。もう一度押してください。","err");return;}
-      setMsg(noteOnly?"登録した。":"登録した。明日の朝、告知投稿が作られます。","good");
+
+      // 同じ日のqueueの告知枠にも note_url を書き込む（今日の告知投稿のリプにURLが付く）
+      let hasAnnounce=false, notePosted=false;
+      if(!noteOnly){
+        const qpath=ACC[acc].q+"/"+state.date+".json";
+        for(let k=0;k<2;k++){
+          const qf=await getFile(qpath);
+          if(qf.status!==200) break;
+          const qd=JSON.parse(qf.text);
+          const ann=(qd.items||[]).find(x=>x.type==="announce");
+          if(!ann) break;
+          hasAnnounce=true; notePosted=!!ann.posted;
+          ann.note_url=url;
+          const qr=await putFile(qpath,JSON.stringify(qd,null,2),qf.sha,"note_url->announce("+acc+"): "+state.date);
+          if(!qr.conflict) break;
+          if(k===1){setMsg("告知枠への書き込みがぶつかりました。もう一度押してください。","err");return;}
+        }
+      }
+
+      if(noteOnly) setMsg("登録した。","good");
+      else if(!hasAnnounce) setMsg("登録した。ただし今日のqueueに告知枠が見当たりません（自動リプなし）。","good");
+      else if(notePosted) setMsg("登録した。ただし告知はすでに投稿済みです。リプは手動で添付してください。","good");
+      else setMsg("登録した。今日の告知投稿が出るとき、そのリプにこのURLが自動で添付されます。","good");
     }catch(e){setMsg(e.message,"err");}
   };
   setMsg("");
