@@ -9,7 +9,7 @@
   :root{
     --paper:#F4F2EA; --card:#FCFBF6; --ink:#212B41; --inkSoft:#63604F;
     --rule:#DFD9C9; --red:#BE402C; --good:#4C6B55;
-    --fukugyo:#C0623B; --intj:#1F2A44; --intp:#2E7D6B;
+    --fukugyo:#C0623B; --intj:#1F2A44; --intp:#2E7D6B; --hana:#B0306A;
     --mincho:"Hiragino Mincho ProN","Yu Mincho",YuMincho,"Noto Serif JP",serif;
     --gothic:"Hiragino Kaku Gothic ProN","Yu Gothic",YuGothic,"Noto Sans JP",sans-serif;
   }
@@ -66,11 +66,14 @@
   .savebar .btn{flex:1;max-width:420px;padding:13px}
   .hidden{display:none!important}
   .hint{font-size:12px;color:var(--inkSoft);margin-top:8px;line-height:1.7}
+  .warn{font-size:13px;color:var(--red);border:1px solid var(--red);border-radius:10px;padding:8px 12px;margin:0 0 12px;line-height:1.7}
   .sum{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;margin-top:6px}
   .sum b{font-size:18px;font-family:var(--mincho)}
   .article{background:#fff;border:1px solid var(--rule);border-radius:11px;padding:16px;line-height:1.95;font-size:15px}
   .article h2{font-size:18px;margin:22px 0 8px} .article h3{font-size:16px;margin:18px 0 6px}
   .article p{margin:0 0 14px}
+  .article hr{border:none;border-top:1px solid var(--rule);margin:18px 0}
+  .article .pr{background:#FDF1F5;border-radius:8px;padding:8px 10px;color:var(--hana)}
   .paywall{border:none;border-top:2px dashed var(--red);margin:22px 0;position:relative}
   .paywall::after{content:"ここから有料";position:absolute;top:-11px;left:50%;transform:translateX(-50%);
     background:#fff;color:var(--red);font-size:12px;padding:0 8px}
@@ -93,7 +96,7 @@
         <path d="M2 15 C 9 4, 15 4, 20 11 S 30 15, 32 5" stroke="var(--red)" stroke-width="2.4" stroke-linecap="round"/>
       </svg>
     </div>
-    <p class="sub">3アカの自動投稿を見張って、必要なら止める。</p>
+    <p class="sub">Threads 3アカの自動投稿と、4アカのnote下書きを見張る。</p>
   </header>
 
   <details id="cfg">
@@ -128,6 +131,7 @@
 
 <script>
 /* ===== アカウント定義（accounts.py と合わせる） ===== */
+/* noteOnly: true のアカは Threads を使わない（note下書きだけ表示する） */
 const ACC={
   fukugyo:{handle:"salesman_firsttime",q:"queue",d:"drafts",n:"notes/fukugyo",color:"var(--fukugyo)",
     types:{shoutai:"困りごと",shoumou:"実況",naoshi:"小技",jitsuen:"やってよかった",cta:"本音"}},
@@ -135,9 +139,12 @@ const ACC={
     types:{aruaru:"観察",gokai:"場面",shikou:"深掘り",ningen:"扱い方",dantei:"本音"}},
   intp:{handle:"intp_labo",q:"queue/intp",d:"drafts/intp",n:"notes/intp",color:"var(--intp)",
     types:{aruaru:"観察",toi:"場面",datsusen:"深掘り",gokai:"扱い方",hitorigoto:"本音"}},
+  hana:{handle:"koi_koi_manual",q:"queue/hana",d:"drafts/hana",n:"notes/hana",color:"var(--hana)",
+    types:{},noteOnly:true,noteDay:"日曜"},
 };
 Object.values(ACC).forEach(a=>a.types.announce="note告知");
-const CHART_COLOR={fukugyo:"#C0623B",intj:"#1F2A44",intp:"#2E7D6B"};
+const CHART_COLOR={fukugyo:"#C0623B",intj:"#1F2A44",intp:"#2E7D6B",hana:"#B0306A"};
+const THREADS_KEYS=Object.keys(ACC).filter(k=>!ACC[k].noteOnly);
 
 /* ===== 朱入れ（従来と同じ） ===== */
 const NG=[["いかがでした","問いかけの締めは避ける。言い切る"],["いかがでしょう","問いかけの締めは避ける。言い切る"],
@@ -230,7 +237,7 @@ async function route(){
   try{
     if(state.tab==="all") await viewAll();
     else if(state.tab==="stats") await viewStats();
-    else if(state.sub==="note") await viewNote(state.tab);
+    else if(ACC[state.tab].noteOnly||state.sub==="note") await viewNote(state.tab);
     else await viewPosts(state.tab);
   }catch(e){setMsg(e.message,"err");}
 }
@@ -251,14 +258,29 @@ function statusOf(it){
 }
 
 /* ===== 全体 ===== */
+async function noteSummary(k){
+  const f=await getFile(ACC[k].n+"/"+state.date+".json");
+  if(f.status!==200) return null;
+  try{return JSON.parse(f.text);}catch(_){return null;}
+}
 async function viewAll(){
   const keys=Object.keys(ACC);
-  const qs=await Promise.all(keys.map(loadQueue));
+  const qs=await Promise.all(keys.map(k=>ACC[k].noteOnly?noteSummary(k):loadQueue(k)));
   let html="";
   keys.forEach((k,i)=>{
     const a=ACC[k], q=qs[i];
     html+='<div class="card accbar" style="--c:'+a.color+'"><div class="meta"><span class="slot">'+esc(a.handle)+'</span>'
+      +(a.noteOnly?'<span class="badge">noteのみ</span>':'')
       +'<button class="btn ghost small right" data-go="'+k+'">開く</button></div>';
+    if(a.noteOnly){
+      if(!q){html+='<div class="type">'+state.date+' のnote下書きはありません（生成は'+esc(a.noteDay||"note日")+'）</div></div>';return;}
+      const pr=(q.body||"").includes("【PR枠");
+      html+='<div class="type">note下書き：'+esc(q.title||"")+'</div>'
+        +'<div class="sum"><span>'+(q.chars||"-")+'字</span>'+(q.style?'<span>'+esc(q.style)+'</span>':'')
+        +(q.url?'<span class="ok">公開済み</span>':'<span>未公開</span>')
+        +(pr?'<span style="color:var(--red)">広告リンク未設定</span>':'')+'</div></div>';
+      return;
+    }
     if(!q){html+='<div class="type">'+state.date+' の下書きはまだありません</div></div>';return;}
     const it=q.data.items||[];
     const ok=it.filter(x=>x.approved).length, done=it.filter(x=>x.posted).length, sk=it.filter(x=>x.skipped).length;
@@ -268,10 +290,12 @@ async function viewAll(){
   });
   $("view").innerHTML=html; setMsg("");
 }
-$("view").addEventListener("click",e=>{const b=e.target.closest("[data-go]");if(!b)return;state.tab=b.dataset.go;state.sub="posts";route();});
+$("view").addEventListener("click",e=>{const b=e.target.closest("[data-go]");if(!b)return;state.tab=b.dataset.go;
+  state.sub=ACC[state.tab].noteOnly?"note":"posts";route();});
 
 /* ===== 投稿 ===== */
 function subTabs(acc){
+  if(ACC[acc].noteOnly) return '<div class="subtabs"><span class="tab on">note</span></div>';
   return '<div class="subtabs"><button class="tab'+(state.sub==="posts"?" on":"")+'" data-sub="posts">Threads</button>'
     +'<button class="tab'+(state.sub==="note"?" on":"")+'" data-sub="note">note</button></div>';
 }
@@ -349,6 +373,8 @@ function md2html(src){
   return src.split(/\n\s*\n/).map(b=>{
     b=b.trim(); if(!b) return "";
     if(/ここから有料/.test(b)&&b.length<30) return '<hr class="paywall">';
+    if(/^-{3,}$/.test(b)) return "<hr>";
+    if(/^【PR枠/.test(b)) return '<p class="pr">'+inline(b)+'</p>';
     const h=b.match(/^(#{1,6})\s+(.+)$/);
     if(h&&!b.includes("\n")) return (h[1].length<=2?"<h2>":"<h3>")+inline(h[2])+(h[1].length<=2?"</h2>":"</h3>");
     return "<p>"+b.split("\n").map(inline).join("<br>")+"</p>";
@@ -365,6 +391,7 @@ async function copyRich(html,text){
 }
 function chromePrompt(acc,n){
   const paid=n.kind==="paid";
+  const hasPR=(n.body||"").includes("【PR枠");
   const here=location.origin+location.pathname+"?acc="+acc+"&date="+state.date+"&type=note";
   const L=[];
   L.push("noteに記事の下書きを作ってください。公開はせず、下書き保存までで止めてください。");
@@ -387,15 +414,14 @@ function chromePrompt(acc,n){
   L.push("2. タイトル欄に上のタイトルを入力する");
   L.push("3. 管制塔の「本文（書式つき）」ボタンを押してコピーし、noteの本文欄に貼り付ける。見出しや太字が崩れていたら、noteの見出し機能で整える");
   L.push("4. 管制塔の「サムネを保存」でダウンロードした画像を、noteの見出し画像に設定する");
+  let s=5;
   if(paid){
-    L.push("5. 本文中の「――― ここから有料 ―――」の行を削除し、その位置に有料エリアの境界線を置く");
-    L.push("6. 公開設定で「有料」を選び、価格を"+n.price+"円にする");
-    L.push("7. ハッシュタグを上のとおり設定する");
-    L.push("8. 「下書き保存」を押す。公開ボタンは押さない");
-  }else{
-    L.push("5. ハッシュタグを上のとおり設定する");
-    L.push("6. 「下書き保存」を押す。公開ボタンは押さない");
+    L.push((s++)+". 本文中の「――― ここから有料 ―――」の行を削除し、その位置に有料エリアの境界線を置く");
+    L.push((s++)+". 公開設定で「有料」を選び、価格を"+n.price+"円にする");
   }
+  if(hasPR) L.push((s++)+". 本文中の【PR枠：〜】の行は、消さずにそのまま残す（広告リンクは自分で入れる）");
+  L.push((s++)+". ハッシュタグを上のとおり設定する");
+  L.push((s++)+". 「下書き保存」を押す。公開ボタンは押さない");
   L.push("");
   L.push("終わったら、うまくいかなかった箇所があれば具体的に教えてください。");
   return L.join("\n");
@@ -406,19 +432,25 @@ async function viewNote(acc){
   const jf=await getFile(jpath);
   let n=null, sha=null;
   if(jf.status===200){n=JSON.parse(jf.text);sha=jf.sha;}
-  else{
+  else if(!ACC[acc].noteOnly){
     const f=await getFile(ACC[acc].d+"/"+state.date+".md");
     const old=f.status===200?parseNote(f.text):null;
     if(old) n={title:old.title,body:old.body,kind:"free",alt_titles:old.other?old.other.split(" / "):[],hashtags:[]};
   }
-  if(!n){$("view").innerHTML=subTabs(acc)+'<p class="type">'+state.date+' のnote下書きはありません（noteの生成日だけ作られます）</p>';setMsg("");return;}
+  if(!n){$("view").innerHTML=subTabs(acc)+'<p class="type">'+state.date+' のnote下書きはありません（'
+    +(ACC[acc].noteDay?"生成は"+esc(ACC[acc].noteDay):"noteの生成日だけ作られます")+'）</p>';setMsg("");return;}
   const html=md2html(n.body);
   const paid=n.kind==="paid";
+  const noteOnly=!!ACC[acc].noteOnly;
+  const hasPR=(n.body||"").includes("【PR枠");
   $("view").innerHTML=subTabs(acc)
     +'<div class="card">'
     +'<div class="meta"><span class="badge '+(paid?"red":"good")+'">'+(paid?"有料・"+n.price+"円":"無料")+'</span>'
+    +(n.style?'<span class="badge">'+esc(n.style)+'</span>':'')
     +(n.chars?'<span class="type">'+n.chars+'字</span>':'')
-    +(n.announced?'<span class="badge good right">告知済み '+esc(n.announced.slice(5))+'</span>':(n.url?'<span class="badge right">明朝に告知予定</span>':''))+'</div>'
+    +(noteOnly?(n.url?'<span class="badge good right">公開済み</span>':'')
+      :(n.announced?'<span class="badge good right">告知済み '+esc(n.announced.slice(5))+'</span>':(n.url?'<span class="badge right">明朝に告知予定</span>':'')))+'</div>'
+    +(hasPR?'<div class="warn">広告リンクが未設定です。公開前に、本文の【PR枠】の行をA8のリンクに差し替えるか、枠ごと消してください。</div>':'')
     +'<div id="thumbBox" style="margin:4px 0 12px"></div>'
     +'<p class="ntitle">'+esc(n.title)+'</p>'
     +'<div class="row" style="margin-bottom:12px">'
@@ -431,14 +463,15 @@ async function viewNote(acc){
     +(n.alt_titles&&n.alt_titles.length?'<p class="hint">別のタイトル候補：'+n.alt_titles.map(esc).join(" / ")+'</p>':'')
     +'</div>'
     +(n.hashtags&&n.hashtags.length?'<div class="card"><h2 class="sec">ハッシュタグ（'+n.hashtags.length+'個）</h2>'
-      +'<p class="hint" style="margin-top:0">関連するnote記事でよく使われている順。タップで選ぶ／外す（最初は全部選択）。</p>'
+      +'<p class="hint" style="margin-top:0">'+(noteOnly?"固定タグ＋関連するnote記事でよく使われている順。":"関連するnote記事でよく使われている順。")+'タップで選ぶ／外す（最初は全部選択）。</p>'
       +'<div class="tags" id="tagBox">'+n.hashtags.map((t,i)=>'<button class="tag on" data-tag="'+i+'">'+esc(t)+'</button>').join("")+'</div>'
       +'<div class="row"><button class="btn small" id="cpTagsSel">選んだタグをコピー</button>'
       +'<button class="btn ghost small" id="tagAll">全部選ぶ</button><button class="btn ghost small" id="tagNone">全部外す</button></div></div>':'')
     +(jf.status===200?'<div class="card"><h2 class="sec">公開したらURLを登録</h2>'
       +'<input type="text" id="noteUrl" placeholder="https://note.com/..." value="'+esc(n.url||"")+'" autocapitalize="off" spellcheck="false"/>'
       +'<div style="margin-top:10px"><button class="btn" id="saveUrl">登録する</button></div>'
-      +'<p class="hint">登録すると、翌朝の生成で '+esc(ACC[acc].handle)+' の最後の枠がこの記事の告知投稿になります。</p></div>':'');
+      +'<p class="hint">'+(noteOnly?"公開済みの記録として残ります（このアカはThreadsがないので、告知投稿は作られません）。"
+        :"登録すると、翌朝の生成で "+esc(ACC[acc].handle)+" の最後の枠がこの記事の告知投稿になります。")+'</p></div>':'');
 
   if(n.thumb){
     const u=await getBlobURL(n.thumb);
@@ -464,7 +497,7 @@ async function viewNote(acc){
       const cur=await getFile(jpath); const data=JSON.parse(cur.text); data.url=url;
       const r=await putFile(jpath,JSON.stringify(data,null,2),cur.sha,"note url("+acc+"): "+state.date);
       if(r.conflict){setMsg("ぶつかりました。もう一度押してください。","err");return;}
-      setMsg("登録した。明日の朝、告知投稿が作られます。","good");
+      setMsg(noteOnly?"登録した。":"登録した。明日の朝、告知投稿が作られます。","good");
     }catch(e){setMsg(e.message,"err");}
   };
   setMsg("");
@@ -472,7 +505,8 @@ async function viewNote(acc){
 
 /* ===== 数字 ===== */
 async function viewStats(){
-  const keys=Object.keys(ACC);
+  const keys=THREADS_KEYS;           /* フォロワー・型別・トップ5は Threads のアカだけ */
+  const allKeys=Object.keys(ACC);    /* noteの記録は全アカ */
   const days=[...Array(14)].map((_,i)=>addDays(state.date,-i));
   const fol={}, posts=[];
   await Promise.all(keys.map(async k=>{
@@ -489,19 +523,19 @@ async function viewStats(){
   const notes=await getFile("metrics/note.jsonl");
   const noteRows=notes.status===200?notes.text.split("\n").filter(Boolean).map(l=>JSON.parse(l)):[];
 
-  let html='<div class="card"><h2 class="sec">フォロワー推移</h2><div class="chartbox"><canvas id="cFol"></canvas></div></div>'
+  let html='<div class="card"><h2 class="sec">フォロワー推移（Threads）</h2><div class="chartbox"><canvas id="cFol"></canvas></div></div>'
     +'<div class="card"><h2 class="sec">型別の平均閲覧（24h・直近14日）</h2>'
     +'<select id="typeAcc" style="max-width:240px;margin-bottom:8px">'+keys.map(k=>'<option value="'+k+'">'+ACC[k].handle+'</option>').join("")+'</select>'
     +'<div class="chartbox"><canvas id="cType"></canvas></div></div>'
     +'<div class="card"><h2 class="sec">閲覧トップ5（24h・直近14日）</h2><div id="top"></div></div>'
     +'<div class="card"><h2 class="sec">noteの数字を記録（週1）</h2>'
-    +'<label>アカ</label><select id="nAcc">'+keys.map(k=>'<option value="'+k+'">'+ACC[k].handle+'</option>').join("")+'</select>'
+    +'<label>アカ</label><select id="nAcc">'+allKeys.map(k=>'<option value="'+k+'">'+ACC[k].handle+'</option>').join("")+'</select>'
     +'<label>記事タイトル</label><input type="text" id="nTitle"/>'
     +'<div class="grid2"><div><label>公開日</label><input type="date" id="nPub"/></div><div><label>種類</label><select id="nKind"><option>無料</option><option>有料</option></select></div>'
     +'<div><label>閲覧</label><input type="number" id="nViews"/></div><div><label>スキ</label><input type="number" id="nLikes"/></div>'
     +'<div><label>販売数</label><input type="number" id="nSales"/></div><div><label>売上（円）</label><input type="number" id="nRev"/></div></div>'
     +'<div style="margin-top:12px"><button class="btn" id="nSave">記録する</button></div>'
-    +'<p class="hint">記録は metrics/note.jsonl に追記され、毎晩スプレッドシートにも反映されます。直近の記録：'+noteRows.length+'件</p></div>';
+    +'<p class="hint">記録は metrics/note.jsonl に追記され、毎晩スプレッドシートにも反映されます。アフィリエイトの成果はA8の管理画面で見て、売上（円）に入れてください。直近の記録：'+noteRows.length+'件</p></div>';
   $("view").innerHTML=html;
 
   /* フォロワー */
@@ -558,6 +592,7 @@ $("date").onchange=()=>{state.date=$("date").value||todayJST();route();};
 
 loadCfg();
 $("date").value=state.date;
+if(state.tab!=="all"&&state.tab!=="stats"&&ACC[state.tab].noteOnly) state.sub="note";
 route();
 </script>
 </body>
